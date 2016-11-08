@@ -1,0 +1,234 @@
+// GRAPH //
+template <typename N, typename E>
+Graph<N, E>::Graph(const Graph& other) {
+   for (const auto& pair : other.nodes) {
+      addNode(pair.first);
+   }
+   for (const auto& pair : other.nodes) {
+      for (const auto& edge : pair.second->getOutgoingEdges()) {
+         addEdge(pair.first, edge->getDstValue(), edge->getWeight());
+      }
+   }
+}
+template <typename N, typename E>
+Graph<N, E>::Graph(Graph&& other) : Graph() {
+   other.swap(*this);
+}
+template <typename N, typename E>
+Graph<N,E>& Graph<N, E>::operator=(const Graph& other) {
+   if (this != &other) {
+      auto tmp = Graph{other};
+      tmp.swap(*this);
+   }
+   return *this;
+}
+template <typename N, typename E>
+Graph<N,E>& Graph<N, E>::operator=(Graph&& other) {
+   if (this != &other) {
+      auto tmp = Graph{std::move(other)};
+      tmp.swap(*this);
+   }
+   return *this;
+}
+template <typename N, typename E>
+bool Graph<N, E>::addNode(const N& val) {
+   if (! isNode(val)) {
+      nodes.emplace(val, std::make_shared<Node>(val));
+      begin();
+      return true;
+   }
+   return false;
+}
+template <typename N, typename E>
+bool Graph<N, E>::addEdge(const N& src, const N& dst, const E& w) {
+   if (! (isNode(src) && isNode(dst))) {
+      throw std::runtime_error("Either src or dst does not exist!");
+   }
+   auto srcNode = getNodePtr(src);
+   if (! srcNode->edgeExists(dst, w)) {
+      srcNode->addOutgoingEdge(Edge(getNodePtr(dst), w));
+      return true;
+   }
+   return false;
+}
+template <typename N, typename E>
+bool Graph<N, E>::replace(const N& oldData, const N& newData) {
+   if (! isNode(oldData)) {
+      throw std::runtime_error("A node containing oldData does not exist");
+   }
+   if (isNode(newData)) {
+      return false;
+   }
+
+   auto node = getNodePtr(oldData);
+   nodes.erase(oldData);
+   nodes.emplace(newData, node);
+   node->setValue(newData);
+   begin();
+   return true;
+}
+template <typename N, typename E>
+void Graph<N, E>::mergeReplace(const N& oldData, const N& newData) {
+   if (!(isNode(oldData) && isNode(newData))) {
+      throw std::runtime_error("Either src or dst does not exist!");
+   }
+   auto newNode = getNodePtr(newData);
+
+   // Merge all non duplicate edges
+   for (const auto& e : getNodePtr(oldData)->getOutgoingEdges()) {
+      if (! newNode->edgeExists(e->getDstValue(), e->getWeight())) {
+         addEdge(newData, e->getDstValue(), e->getWeight());
+      }
+   }
+   nodes.erase(oldData);
+
+   // now make everything that was pointing at oldNode point to newNode
+   for (const auto& node : nodes) {
+      for (const auto& edge : node.second->getOutgoingEdges()) {
+         if (edge->isDanglingEdge()) {
+            edge->setDstPtr(newNode);
+         }
+      }
+   }
+   deleteNode(oldData);
+}
+template <typename N, typename E>
+void Graph<N, E>::deleteNode(const N& val) noexcept {
+   if (isNode(val)) {
+      nodes.erase(val);
+   }
+   for (const auto& node : nodes) {
+      node.second->purgeDanglingEdges();
+   }
+   begin();
+}
+template <typename N, typename E>
+void Graph<N, E>::deleteEdge(const N& src, const N& dst, const E& w) noexcept {
+   if (isNode(src) && isNode(dst)) {
+      auto srcNode = getNodePtr(src);
+      if (srcNode->edgeExists(dst, w)) {
+         srcNode->deleteOutgoingEdge(w, dst);
+      }
+   }
+}
+template <typename N, typename E>
+void Graph<N, E>::clear() noexcept {
+   nodes.clear();
+   begin();
+}
+template <typename N, typename E>
+bool Graph<N, E>::isNode(const N& val) const {
+   return nodes.find(val) != nodes.cend();
+}
+template <typename N, typename E>
+bool Graph<N, E>::isConnected(const N& src, const N& dst) const {
+   if (isNode(src) && isNode(dst)) {
+      return getNodePtr(src)->anyEdgeExists(dst);
+   }
+   throw std::runtime_error("Either a node containing oldData does not exist");
+}
+template <typename N, typename E>
+void Graph<N, E>::printNodes() const {
+   auto nodesTmp = std::vector<std::shared_ptr<Node>>{};
+   std::transform(nodes.cbegin(), nodes.cend(), std::back_inserter(nodesTmp), [](const auto& n) { return n.second; });
+
+   std::sort(nodesTmp.begin(), nodesTmp.end(),
+      [](const auto& a, const auto& b) {
+         if (a->getDegree() == b->getDegree()) {
+            return a->getValue() < b->getValue();
+         }
+         return a->getDegree() < b->getDegree();
+      }
+   );
+   for (const auto& nodeP : nodesTmp) {
+      std::cout << nodeP->getValue() << '\n';
+   }
+}
+template <typename N, typename E>
+void Graph<N, E>::printEdges(const N& val) const {
+   if (!isNode(val)) {
+      throw std::runtime_error("Source node does not exist in graph");
+   }
+
+   std::cout << "Edges attached to Node " << val << '\n';
+   auto edges = getNodePtr(val)->getOutgoingEdges();
+
+   std::sort(edges.begin(), edges.end(),
+      [](const auto& a, const auto& b) {
+         if (a->getWeight() == b->getWeight()) {
+            return a->getDstValue() < b->getDstValue();
+         }
+         return a->getWeight() < b->getWeight();
+      }
+   );
+
+   if (edges.empty()) {
+      std::cout << "(null)\n";
+   } else {
+      for (const auto& edge : edges) {
+            std::cout << edge->getDstValue() << ' ' << edge->getWeight() << '\n';
+      }
+   }
+}
+template <typename N, typename E>
+void Graph<N, E>::swap(Graph& other) {
+   std::swap(nodes, other.nodes);
+   std::swap(it, other.it);
+}
+
+// EDGE //
+template <typename N, typename E>
+const N& Graph<N, E>::Edge::getDstValue() const {
+   if (auto sp = dst.lock()) return sp->getValue();
+   throw std::runtime_error("There is an edge that tried to access a non-existant node");
+}
+template <typename N, typename E>
+void Graph<N, E>::Edge::setDstPtr(std::shared_ptr<Node> sp) {
+   auto wp = std::weak_ptr<Node>{sp};
+   dst.reset();
+   dst = wp;
+}
+
+// NODE //
+template <typename N, typename E>
+void Graph<N, E>::Node::addOutgoingEdge(const Edge& e) {
+   outgoingEdges.emplace_back(std::make_shared<Edge>(e));
+}
+template <typename N, typename E>
+bool Graph<N, E>::Node::edgeExists(const N& dst, const E& w) const {
+   return std::find_if(outgoingEdges.cbegin(),
+                       outgoingEdges.cend(),
+                       [&dst, &w](const auto& e) {
+                          return e->getWeight() == w && e->getDstValue() == dst;
+                       }) != outgoingEdges.cend();
+}
+template <typename N, typename E>
+bool Graph<N, E>::Node::anyEdgeExists(const N& dst) const {
+   return std::find_if(outgoingEdges.cbegin(),
+                       outgoingEdges.cend(),
+                       [&dst](const auto& e) {
+                          return e->getDstValue() == dst;
+                       }) != outgoingEdges.cend();
+}
+template <typename N, typename E>
+void Graph<N, E>::Node::deleteOutgoingEdge(const E& w, const N& dst) {
+   outgoingEdges.erase(std::remove_if(
+      outgoingEdges.begin(),
+      outgoingEdges.end(),
+      [&w, &dst](const auto& e) {
+         return e->getWeight() == w && e->getDstValue() == dst;
+      }),
+      outgoingEdges.end()
+   );
+}
+template <typename N, typename E>
+void Graph<N, E>::Node::purgeDanglingEdges() {
+   outgoingEdges.erase(std::remove_if(
+      outgoingEdges.begin(),
+      outgoingEdges.end(),
+      [](const auto& e) {
+         return e->isDanglingEdge();
+      }),
+      outgoingEdges.end()
+   );
+}

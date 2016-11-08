@@ -1,0 +1,154 @@
+#ifndef BTREE_ITERATOR_TEM
+#define BTREE_ITERATOR_TEM
+
+template <typename T>
+btree_iterator<T>::btree_iterator(Node* n, unsigned int p, bool isValid)
+    : currPtr{n}, pos{p}, isValid{n == nullptr ? false : isValid}
+{
+}
+template <typename T>
+typename btree_iterator<T>::reference btree_iterator<T>::operator*() const {
+    return currPtr->elems[pos];
+}
+template <typename T>
+typename btree_iterator<T>::pointer btree_iterator<T>::operator->() const {
+    return &(operator*());
+}
+template <typename T>
+btree_iterator<T>& btree_iterator<T>::operator++() {
+    if (currPtr == nullptr) {
+        return *this;
+    }
+    if (!isValid) {
+        isValid = true;
+        return *this;
+    }
+    auto prevValue = currPtr->elems[pos];
+
+    while (currPtr->elems[pos] <= prevValue && isValid) {
+        if (pos < currPtr->elems.size()-1) {
+            ++pos;
+            while(currPtr->hasChildAt(pos)) {
+                currPtr = currPtr->getLeftChildAt(pos);
+                pos = 0;
+            }
+        } else {
+            if (pos == currPtr->elems.size()-1 && currPtr->hasRightChild()) {
+                currPtr = currPtr->getRightChild();
+                pos = 0;
+            } else {
+                if (currPtr->hasParent()) {
+                    // assert(currPtr->parent != nullptr);
+                    auto oldPos = pos;
+                    auto oldPtr = currPtr;
+                    while(prevValue >= currPtr->elems[pos] &&  pos == currPtr->elems.size()-1) {
+                        if (!currPtr->hasParent()) {
+                            pos = oldPos;
+                            currPtr = oldPtr;
+                            isValid = false;
+                            break;
+                        }
+                        pos = currPtr->posInParent;
+                        currPtr = currPtr->parent;
+                    }
+
+                } else {
+                    isValid = false;
+                    break;
+                }
+            }
+        }
+    }
+    return *this;
+}
+
+template <typename T>
+btree_iterator<T> btree_iterator<T>::operator++(int) {
+    auto tmp = *this;
+    ++*this;
+    return tmp;
+}
+
+template <typename T>
+btree_iterator<T>& btree_iterator<T>::operator--() {
+    if (currPtr == nullptr) {
+        return *this;
+    }
+    if (!isValid) {
+        isValid = true;
+        return *this;
+    }
+    auto prevValue = currPtr->elems[pos];
+
+    while (currPtr->elems[pos] >= prevValue && isValid) {
+        if (pos > 0) {
+            //  1. go down to the max in the subtree at pos
+            //  2. go left --pos
+            if (currPtr->hasChildAt(pos)) {
+                currPtr = currPtr->getLeftChildAt(pos);
+                pos = currPtr->elems.size()-1;
+                while(currPtr->hasRightChild()) {
+                    currPtr = currPtr->getRightChild();
+                    pos = currPtr->elems.size()-1;
+                }
+            } else {
+                --pos;
+            }
+        } else {
+            // assert(pos <= 0);
+            // 1. go down to the max in the subtree at pos
+            // 2. go up parents until i can go left, --pos
+            if (currPtr->hasChildAt(pos)) {
+                while(currPtr->hasChildAt(pos)) {
+                    currPtr = currPtr->getLeftChildAt(pos);
+                    pos = currPtr->elems.size()-1;
+                    // assert(currPtr->elems[pos] < prevValue);
+                }
+            } else {
+                if (currPtr->hasParent()) {
+                    // assert(currPtr->parent != nullptr);
+
+                    auto oldPos = pos;
+                    auto oldPtr = currPtr;
+
+                    while(currPtr->hasParent()) {
+                        pos = currPtr->posInParent;
+                        currPtr = currPtr->parent;
+                        if (pos > 0) {
+                            break;
+                        }
+                    }
+                    if (pos == 0) {
+                        pos = oldPos;
+                        currPtr = oldPtr;
+                        isValid = false;
+                    } else if (currPtr->elems[pos] > prevValue) {
+                        --pos;
+                    }
+                }
+            }
+        }
+    }
+    return *this;
+}
+
+template <typename T>
+btree_iterator<T> btree_iterator<T>::operator--(int) {
+    auto tmp = *this;
+    --*this;
+    return tmp;
+}
+
+template <typename T>
+bool btree_iterator<T>::operator==(const btree_iterator& other) const {
+    if (isValid == false && other.isValid == false) {
+        return true;
+    }
+    return currPtr == other.currPtr && pos == other.pos && isValid == other.isValid;
+}
+
+template <typename T>
+bool btree_iterator<T>::operator!=(const btree_iterator& other) const {
+    return !operator==(other);
+}
+#endif

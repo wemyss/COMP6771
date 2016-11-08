@@ -1,0 +1,328 @@
+#ifndef BTREE_TEM
+#define BTREE_TEM
+
+template <typename T>
+btree<T>::btree(const btree& other)
+    : maxNodeElems{other.maxNodeElems}
+{
+    auto q = std::queue<Node*>{};
+    q.push(other.root.get());
+
+    while(! q.empty()) {
+        auto curr = q.front();
+        q.pop();
+        for(auto i = 0U; i < curr->elems.size(); ++i) {
+            insert(curr->elems[i]);
+            if (curr->hasChildAt(i)) {
+                q.push(curr->getLeftChildAt(i));
+            }
+        }
+        if (curr->hasRightChild()) {
+            q.push(curr->getRightChild());
+        }
+    }
+}
+
+template <typename T>
+btree<T>& btree<T>::operator=(const btree& other) {
+    btree<T>{other}.swap(*this);
+    return *this;
+}
+
+template <typename T>
+std::ostream& operator<< (std::ostream& o, const btree<T>& b)  {
+    // TODO: change to std::copy to ostream_iterator
+    if (b.root != nullptr) {
+        auto q = std::queue<typename btree<T>::Node*>{};
+        q.push(b.root.get());
+        while(! q.empty()) {
+            auto curr = q.front();
+            q.pop();
+            for(auto i = 0U; i < curr->elems.size(); ++i) {
+                if (i > 0 || curr != b.root.get()) {
+                    o << ' ';
+                }
+                o << curr->elems[i];
+
+                if (curr->hasChildAt(i)) {
+                    q.push(curr->getLeftChildAt(i));
+                }
+            }
+            if (curr->hasRightChild()) {
+                q.push(curr->getRightChild());
+            }
+        }
+    }
+    return o;
+}
+
+
+// ITERATORS
+template <typename T>
+typename btree<T>::iterator btree<T>::end() const {
+    return iterator(maxElement());
+}
+template <typename T>
+typename btree<T>::iterator btree<T>::begin() const {
+    if (root == nullptr || root->isEmpty()) {
+        return iterator(end());
+    }
+    auto curr = root.get();
+    while (curr->hasChildAt(0)) {
+        curr = curr->getLeftChild();
+    }
+    return iterator(curr);
+}
+template <typename T>
+typename btree<T>::reverse_iterator btree<T>::rbegin() const {
+    return reverse_iterator(end());
+}
+template <typename T>
+typename btree<T>::reverse_iterator btree<T>::rend() const {
+    return reverse_iterator(begin());
+}
+template <typename T>
+typename btree<T>::const_iterator btree<T>::cbegin() const {
+    return const_iterator(begin());
+}
+template <typename T>
+typename btree<T>::const_iterator btree<T>::cend() const {
+    return const_iterator(end());
+}
+template <typename T>
+typename btree<T>::const_reverse_iterator btree<T>::crbegin() const {
+    return const_reverse_iterator(rbegin());
+}
+template <typename T>
+typename btree<T>::const_reverse_iterator btree<T>::crend() const {
+    return const_reverse_iterator(rend());
+}
+
+
+// METHODS
+template <typename T>
+typename btree<T>::iterator btree<T>::find(const T& elem) {
+    return findElem(elem);
+}
+template <typename T>
+typename btree<T>::const_iterator btree<T>::find(const T& elem) const {
+    return findElem(elem);
+}
+
+template <typename T>
+std::pair<typename btree<T>::iterator, bool> btree<T>::insert(const T& elem) {
+    if (root == nullptr || root->isEmpty()) {
+        root = std::make_unique<Node>(0, nullptr, elem, maxNodeElems);
+        return std::make_pair(iterator(root.get(), 0), true);
+    }
+
+    auto curr = root.get();
+    auto i = 0U;
+    // get leaf node where it should be
+    while (curr->isFull()) {
+        // node should always be full here
+        // assert(curr->elems.size() == maxNodeElems);
+
+        if (elem < curr->elems[i]) {
+            if (curr->getLeftChildAt(i) == nullptr) {
+                curr->createLeftChildAt(i);
+            }
+            curr = curr->getLeftChildAt(i);
+            i = 0;
+
+        } else if (elem > curr->elems[i]) {
+            if (i < maxNodeElems-1) {
+                ++i;
+            } else {
+                if (curr->getRightChild() == nullptr) {
+                    curr->createRightChild();
+                }
+                curr = curr->getRightChild();
+                i = 0;
+            }
+        } else {
+            return std::make_pair(iterator(curr, i), false);    // Found match
+        }
+    }
+    // should always be a non-full node here
+    // assert(curr->elems.size() < maxNodeElems);
+    auto elems = curr->elems;
+    while (i < elems.size()) {
+        if (elem == elems[i]) {
+            return std::make_pair(iterator(curr, i), false);    // Found match
+        } else if (elem < elems[i]) {
+            break;
+        } else {
+            ++i;
+        }
+    }
+
+    curr->emplaceElementBefore(i, elem);
+    // assert(curr->elems[i] == elem);
+    return std::make_pair(iterator(curr, i), true);
+}
+
+
+// PRIVATES
+template <typename T>
+typename btree<T>::iterator btree<T>::maxElement() const {
+    auto curr = root.get();
+    while (curr->hasRightChild()) {
+        curr = curr->getRightChild();
+    }
+    return iterator(curr, curr->elems.size()-1, false);
+}
+template <typename T>
+void btree<T>::clear() noexcept {
+    maxNodeElems = DEFAULT_MAX_NODE_ELEMS;
+    root.reset(nullptr);
+}
+template <typename T>
+void btree<T>::swap(btree& other) noexcept {
+    std::swap(maxNodeElems, other.maxNodeElems);
+    std::swap(root, other.root);
+}
+template <typename T>
+typename btree<T>::iterator btree<T>::findElem(const T& elem) const {
+    if (root == nullptr || root->isEmpty()) {
+        return end();
+    }
+
+    auto curr = root.get();
+    auto i = 0U;
+    // get leaf node where it should be
+    while (curr->isFull()) {
+        if (elem < curr->elems[i]) {
+            if (curr->hasChildAt(i)) {
+                curr = curr->getLeftChildAt(i);
+                i = 0;
+            } else {
+                return end();
+            }
+        } else if (elem > curr->elems[i]) {
+            if (i < maxNodeElems-1) {
+                ++i;
+            } else {
+                if (curr->getRightChild() == nullptr) {
+                    return end();
+                }
+                curr = curr->getRightChild();
+                i = 0;
+            }
+        } else {
+            return iterator(curr, i);    // Found match
+        }
+    }
+
+    // should always be a non-full node here
+    // assert(curr->elems.size() < maxNodeElems);
+    auto elems = curr->elems;
+    while (i < elems.size()) {
+        if (elem == elems[i]) {
+            return iterator(curr, i);    // Found match
+        } else if (elem < elems[i]) {
+            break;
+        } else {
+            ++i;
+        }
+    }
+    return end();
+}
+
+
+// NODE
+template <typename T>
+btree<T>::Node::Node() {
+    clearChildren();
+}
+template <typename T>
+btree<T>::Node::Node(unsigned int posP, Node* p, const size_t m)
+    : posInParent{posP}, parent{p}, maxNodeElems{m}
+{
+    clearChildren();
+}
+template <typename T>
+btree<T>::Node::Node(unsigned int posP, Node* p, const T& val, const size_t m)
+    : posInParent{posP}, parent{p}, elems{val}, maxNodeElems{m}
+{
+    clearChildren();
+}
+template <typename T>
+void btree<T>::Node::printNode(int level) const {
+    std::cout << "NODE " << level << ": ";
+    for (auto i = 0U; i < elems.size(); ++i) {
+        std::cout << elems[i] << " (" << posInParent << ") ";
+    }
+    std::cout << "\n";
+    for(auto i = 0U; i < leftChildren.size(); ++i) {
+        if (leftChildren[i] != nullptr) {
+            leftChildren[i]->printNode(level+1);
+        }
+    }
+    if (rightChild != nullptr) {
+        rightChild->printNode(level+1);
+    }
+}
+template <typename T>
+void btree<T>::Node::clearChildren() {
+    leftChildren.clear();
+    for (auto i = 0U; i < maxNodeElems; ++i) {
+        leftChildren.push_back(nullptr);
+    }
+    rightChild = nullptr;
+}
+template <typename T>
+void btree<T>::Node::createLeftChildAt(unsigned int i) {
+    leftChildren[i] = std::make_unique<Node>(i, this, maxNodeElems);
+}
+template <typename T>
+void btree<T>::Node::createRightChild() {
+    rightChild = std::make_unique<Node>(elems.size()-1, this, maxNodeElems);
+}
+
+template <typename T>
+typename btree<T>::Node* btree<T>::Node::getLeftChildAt(unsigned int i) const {
+    return leftChildren[i].get();
+}
+template <typename T>
+typename btree<T>::Node* btree<T>::Node::getRightChild() const {
+    return rightChild.get();
+}
+template <typename T>
+typename btree<T>::Node* btree<T>::Node::getLeftChild() const {
+    return getLeftChildAt(0);
+}
+template <typename T>
+bool btree<T>::Node::hasChildAt(unsigned int i) const {
+    return getLeftChildAt(i) != nullptr;
+}
+template <typename T>
+bool btree<T>::Node::hasParent() const {
+    return parent != nullptr;
+}
+template <typename T>
+bool btree<T>::Node::hasRightChild() const {
+    return rightChild != nullptr;
+}
+template <typename T>
+bool btree<T>::Node::containsElement(const T& v) const {
+    return std::find(elems.cbegin(), elems.cend(), v);
+}
+
+// Put X in front of the element at index i. If full, do nothing
+template <typename T>
+void btree<T>::Node::emplaceElementBefore(unsigned int index, const T& elem) {
+    if (! isFull()) {
+        elems.emplace(elems.cbegin() + index, elem);
+    }
+}
+template <typename T>
+bool btree<T>::Node::isFull() const {
+    return elems.size() == maxNodeElems;
+}
+template <typename T>
+bool btree<T>::Node::isEmpty() const {
+    return elems.empty();
+}
+
+#endif
