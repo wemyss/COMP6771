@@ -3,23 +3,16 @@
 namespace evec
 {
     // CONSTRUCTORS
-    EuclideanVector::EuclideanVector(const int numD, const double m)
-        : num_dimensions_{static_cast<unsigned int>(numD)},
+    EuclideanVector::EuclideanVector(const unsigned int numD, const double m)
+        : num_dimensions_{numD},
           magnitudes_{new double[num_dimensions_]}
     {
-        for (auto i = 0U; i < num_dimensions_; ++i) {
-            magnitudes_[i] = m;
-        }
+        std::fill(magnitudes_, magnitudes_ + num_dimensions_, m);
     }
 
     EuclideanVector::EuclideanVector(std::initializer_list<double> list)
-        : num_dimensions_{static_cast<unsigned int>(list.size())},
-          magnitudes_{new double[num_dimensions_]()}
+        : EuclideanVector(list.begin(), list.end())
     {
-        auto i = 0U;
-        for (const auto m : list) {
-            magnitudes_[i++] = m;
-        }
     }
 
     // Copy constructor
@@ -37,13 +30,13 @@ namespace evec
         : num_dimensions_{0},
           magnitudes_{nullptr}
     {
-        swap(*this, other);
+        other.swap(*this);
     }
 
     // MEMBER FUNCTIONS
     EuclideanVector& EuclideanVector::operator=(const EuclideanVector& other) {
         EuclideanVector tmp{other};
-        swap(*this, tmp);
+        tmp.swap(*this);
         return *this;
     }
 
@@ -129,44 +122,44 @@ namespace evec
     }
 
     // FRIENDS
-    bool operator==(const EuclideanVector& a, const EuclideanVector& b) {
-        if (a.num_dimensions_ != b.num_dimensions_) {
+    bool EuclideanVector::operator==(const EuclideanVector& other) const {
+        if (num_dimensions_ != other.num_dimensions_) {
             return false;
         }
-        for (auto i = 0U; i < a.num_dimensions_; ++i) {
-            if (a.magnitudes_[i] != b.magnitudes_[i]) {
+        for (auto i = 0U; i < num_dimensions_; ++i) {
+            if (magnitudes_[i] != other.magnitudes_[i]) {
                 return false;
             }
         }
         return true;
     }
 
-    EuclideanVector operator+(const EuclideanVector& a, const EuclideanVector& b) {
-        EuclideanVector tmp{a};
-        return tmp += b;
+    EuclideanVector EuclideanVector::operator+(const EuclideanVector& other) const {
+        EuclideanVector tmp{*this};
+        return tmp += other;
     }
 
-    EuclideanVector operator-(const EuclideanVector& a, const EuclideanVector& b) {
-        EuclideanVector tmp{a};
-        return tmp -= b;
+    EuclideanVector EuclideanVector::operator-(const EuclideanVector& other) const {
+        EuclideanVector tmp{*this};
+        return tmp -= other;
     }
 
-    double operator*(const EuclideanVector& a, const EuclideanVector& b) {
+    double EuclideanVector::operator*(const EuclideanVector& other) const {
         auto result = 0.0;
 
-        for (auto i = 0U; i < a.num_dimensions_; ++i) {
-            result += a.magnitudes_[i] * b.magnitudes_[i];
+        for (auto i = 0U; i < num_dimensions_; ++i) {
+            result += magnitudes_[i] * other.magnitudes_[i];
         }
         return result;
     }
 
-    EuclideanVector operator*(const EuclideanVector& a, const double scalar) {
-        EuclideanVector tmp{a};
+    EuclideanVector EuclideanVector::operator*(const double scalar) const {
+        EuclideanVector tmp{*this};
         return tmp *= scalar;
     }
 
-    EuclideanVector operator/(const EuclideanVector& a, const double scalar) {
-        EuclideanVector tmp{a};
+    EuclideanVector EuclideanVector::operator/(const double scalar) const {
+        EuclideanVector tmp{*this};
         return tmp /= scalar;
     }
 
@@ -182,10 +175,10 @@ namespace evec
         return o;
     }
 
-    void swap(EuclideanVector& first, EuclideanVector& second) {
-     // Assuming we can use std::swap, else could use a temp;
-     std::swap(first.num_dimensions_, second.num_dimensions_);
-     std::swap(first.magnitudes_, second.magnitudes_);
-     std::swap(first.euclideanNorm_, second.euclideanNorm_);
+    void EuclideanVector::swap(EuclideanVector& other) {
+     using std::swap;
+     swap(num_dimensions_, other.num_dimensions_);
+     swap(magnitudes_, other.magnitudes_);
+     swap(euclideanNorm_, other.euclideanNorm_);
   }
 }

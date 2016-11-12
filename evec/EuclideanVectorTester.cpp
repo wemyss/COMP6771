@@ -56,6 +56,8 @@ void testFriends() {
 }
 
 int main() {
+    auto testEvec = evec::EuclideanVector{1,2,3,4,5,6,7,8,9};
+    std::cout << testEvec << std::endl;
 
     testFriends();
     evec::EuclideanVector a(2);

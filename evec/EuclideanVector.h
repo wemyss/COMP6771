@@ -16,7 +16,7 @@ namespace evec
    {
    public:
       // CONSTRUCTORS
-      EuclideanVector(const int = 1, const double = 0.0);
+      EuclideanVector(const unsigned int = 1U, const double = 0.0);
       EuclideanVector(const int numD, const int m) : EuclideanVector(static_cast<unsigned int>(numD), static_cast<double>(m)) {}
       EuclideanVector(std::initializer_list<double> list);
       template<typename Iter> EuclideanVector(Iter start, Iter end)
@@ -26,18 +26,17 @@ namespace evec
          std::copy(start, end,  magnitudes_);
       }
 
-      EuclideanVector(const EuclideanVector&);     // Copy constructor
-      EuclideanVector(EuclideanVector&&);          // Move constructor
+      EuclideanVector(const EuclideanVector&);
+      EuclideanVector(EuclideanVector&&);
 
-      // DESTRUCTOR
       ~EuclideanVector()
       {
          delete[] magnitudes_;
       }
 
       // MEMBER FUNCTIONS
-      EuclideanVector& operator=(const EuclideanVector&);   // Copy assignment
-      EuclideanVector& operator=(EuclideanVector&&);        // Move assignment
+      EuclideanVector& operator=(const EuclideanVector&);
+      EuclideanVector& operator=(EuclideanVector&&);
 
       unsigned int getNumDimensions() const { return num_dimensions_; }
       double get(unsigned int i) const { return magnitudes_[i]; }
@@ -54,19 +53,19 @@ namespace evec
       operator std::list<double>() const;
 
       // FRIENDS
-      friend bool operator==(const EuclideanVector&, const EuclideanVector&);
-      friend bool operator!=(const EuclideanVector& a, const EuclideanVector& b) { return !(a == b); }
-      friend EuclideanVector operator+(const EuclideanVector&, const EuclideanVector&);
-      friend EuclideanVector operator-(const EuclideanVector&, const EuclideanVector&);
+      bool operator==(const EuclideanVector&) const;
+      bool operator!=(const EuclideanVector& o) const { return !(*this == o); }
+      EuclideanVector operator+(const EuclideanVector&) const;
+      EuclideanVector operator-(const EuclideanVector&) const;
 
-      friend double operator*(const EuclideanVector&, const EuclideanVector&);
-      friend EuclideanVector operator*(const EuclideanVector&, const double);
-      friend EuclideanVector operator*(const double d, const EuclideanVector& e) { return operator*(e,d); };
+      double operator*(const EuclideanVector&) const;
+      EuclideanVector operator*(const double) const;
+      friend EuclideanVector operator*(const double d, const EuclideanVector& e) { return e*d; };
 
-      friend EuclideanVector operator/(const EuclideanVector&, const double);
+      EuclideanVector operator/(const double) const;
       friend std::ostream& operator<<(std::ostream&, const EuclideanVector&);
 
-      friend void swap(EuclideanVector& first, EuclideanVector& second);
+      void swap(EuclideanVector&);
 
    private:
       unsigned int num_dimensions_;       // Size of vector
